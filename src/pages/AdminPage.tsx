@@ -34,7 +34,7 @@ import {
   forceUpdateAllPrompts,
   checkAndUpdatePromptVersion
 } from '../services/systemPrompt';
-import { updateSystemPrompt } from '../config/systemPrompt';
+
 
 // 스타일 컴포넌트
 const StyledPaper = styled(Paper)(({ theme }) => ({
@@ -396,7 +396,7 @@ const AdminPage: React.FC = () => {
 
   const handleUpdatePrompt = () => {
     try {
-      updateSystemPrompt(newPrompt);
+      saveSystemPrompt(newPrompt);
       setCurrentPrompt(newPrompt);
       setUpdateStatus('success');
       setNewPrompt('');
