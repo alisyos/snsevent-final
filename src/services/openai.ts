@@ -289,10 +289,121 @@ const parseAIResponse = (responseText: string): AIEventResponse => {
       console.log("전체 텍스트 JSON 파싱 성공:", parsed);
       return parsed;
     } catch (directParseError) {
-      console.log("전체 텍스트 직접 파싱 실패, 정규식으로 JSON 찾기 시도");
+      console.log("전체 텍스트 직접 파싱 실패, 문자열 정리 후 재시도");
     }
 
-    // 2단계: 정규식으로 JSON 부분 찾기
+    // 2단계: JSON 문자열 정리 및 수정
+    let cleanedJsonStr = responseText;
+    
+    // 텍스트 앞뒤 공백 제거
+    cleanedJsonStr = cleanedJsonStr.trim();
+    
+    // 코드 블록 마크다운 제거 (```json...``` 형태)
+    cleanedJsonStr = cleanedJsonStr.replace(/```json\s*/g, '').replace(/```\s*$/g, '');
+    cleanedJsonStr = cleanedJsonStr.replace(/```\s*/g, '');
+    
+    // JSON 시작과 끝을 찾기
+    const startIndex = cleanedJsonStr.indexOf('{');
+    const lastIndex = cleanedJsonStr.lastIndexOf('}');
+    
+    if (startIndex !== -1 && lastIndex !== -1 && lastIndex > startIndex) {
+      cleanedJsonStr = cleanedJsonStr.substring(startIndex, lastIndex + 1);
+    }
+    
+    try {
+      // 정리된 문자열로 파싱 시도
+      console.log("정리된 JSON 문자열 길이:", cleanedJsonStr.length);
+      const parsed = JSON.parse(cleanedJsonStr);
+      console.log("정리된 JSON 파싱 성공:", parsed);
+      return parsed;
+    } catch (cleanedParseError) {
+      console.log("정리된 JSON 파싱 실패, 문자 단위 정리 시도:", cleanedParseError);
+    }
+
+    // 3단계: 안전한 JSON 파싱 시도 (eval 대신 단계별 검증)
+    try {
+      // 위험한 문자들을 안전하게 처리
+      let safeJsonStr = cleanedJsonStr;
+      
+      // 백슬래시가 없는 개행 문자들을 \\n으로 변경
+      safeJsonStr = safeJsonStr.replace(/(?<!\\)\n/g, '\\n');
+      safeJsonStr = safeJsonStr.replace(/(?<!\\)\r/g, '\\r');
+      safeJsonStr = safeJsonStr.replace(/(?<!\\)\t/g, '\\t');
+      
+      // 문자열 내부의 이스케이프되지 않은 따옴표 처리
+      // 따옴표로 감싸진 문자열 내부의 따옴표들을 찾아서 이스케이프
+      safeJsonStr = safeJsonStr.replace(/"([^"\\]*(\\.[^"\\]*)*)"/g, (match, content) => {
+        // 이미 이스케이프된 따옴표는 놔두고, 안 된 것만 처리
+        const escapedContent = content.replace(/(?<!\\)"/g, '\\"');
+        return `"${escapedContent}"`;
+      });
+      
+      console.log("안전하게 처리된 JSON 첫 500자:", safeJsonStr.substring(0, 500));
+      const parsed = JSON.parse(safeJsonStr);
+      console.log("안전한 JSON 파싱 성공:", parsed);
+      return parsed;
+    } catch (safeParseError) {
+      console.log("안전한 JSON 파싱도 실패:", safeParseError);
+    }
+
+    // 4단계: 더 단순한 방법 - 문자 하나씩 검증하며 수정
+    try {
+      let fixedJsonStr = cleanedJsonStr;
+      let inString = false;
+      let escapeNext = false;
+      let result = '';
+      
+      for (let i = 0; i < fixedJsonStr.length; i++) {
+        const char = fixedJsonStr[i];
+        const prevChar = i > 0 ? fixedJsonStr[i - 1] : '';
+        
+        if (escapeNext) {
+          result += char;
+          escapeNext = false;
+          continue;
+        }
+        
+        if (char === '\\') {
+          result += char;
+          escapeNext = true;
+          continue;
+        }
+        
+        if (char === '"') {
+          if (inString && prevChar !== '\\') {
+            inString = false;
+          } else if (!inString) {
+            inString = true;
+          }
+          result += char;
+          continue;
+        }
+        
+        // 문자열 내부의 특수 문자 처리
+        if (inString) {
+          if (char === '\n') {
+            result += '\\n';
+          } else if (char === '\r') {
+            result += '\\r';
+          } else if (char === '\t') {
+            result += '\\t';
+          } else {
+            result += char;
+          }
+        } else {
+          result += char;
+        }
+      }
+      
+      console.log("문자별 처리된 JSON 첫 500자:", result.substring(0, 500));
+      const parsed = JSON.parse(result);
+      console.log("문자별 처리 JSON 파싱 성공:", parsed);
+      return parsed;
+    } catch (charParseError) {
+      console.log("문자별 처리 JSON 파싱도 실패:", charParseError);
+    }
+
+    // 5단계: 정규식으로 JSON 부분 찾기 (기존 방식)
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try {
@@ -323,12 +434,13 @@ const parseAIResponse = (responseText: string): AIEventResponse => {
       }
     }
 
-    // JSON 파싱 실패 시 기본 응답 템플릿 반환
+    // JSON 파싱 실패 시 오류 메시지와 함께 기본 응답 템플릿 반환
+    console.error("모든 JSON 파싱 시도가 실패했습니다. 원본 응답:", responseText.substring(0, 1000));
     const defaultResponse: AIEventResponse = {
       event1: {
         startDate: new Date().toISOString().split('T')[0],
         endDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        eventConcept: "AI 응답을 파싱하지 못했습니다. 기본 이벤트 기획안을 제공합니다.",
+        eventConcept: "AI 응답을 파싱하지 못했습니다. 다시 시도해주세요. 문제가 계속되면 입력 내용을 간소화해보세요.",
         contentMechanics: {
           process: ["1. 계획 수립", "2. 이벤트 실행", "3. 결과 분석"],
           postFormats: {
