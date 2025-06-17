@@ -174,6 +174,7 @@ const IntegratedEventPage: React.FC = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [loading, setLoading] = useState(false);
   const [tabValue, setTabValue] = useState(0);
+  const [eventTabValue, setEventTabValue] = useState(0);
   const [feedback, setFeedback] = useState('');
   const [aiResponse, setAiResponse] = useState<AIEventResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -230,6 +231,7 @@ const IntegratedEventPage: React.FC = () => {
         
         const response = await generateEventPlan(requestData);
         setAiResponse(response);
+        setEventTabValue(0); // 새로운 이벤트 생성 시 첫 번째 탭으로 초기화
         console.log("이벤트 생성 완료");
       } catch (err: any) {
         console.error('API 에러:', err);
@@ -259,6 +261,10 @@ const IntegratedEventPage: React.FC = () => {
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
+  };
+
+  const handleEventTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setEventTabValue(newValue);
   };
   
   const handleFeedbackChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -518,15 +524,12 @@ const IntegratedEventPage: React.FC = () => {
       );
     }
 
-    // 새로운 JSON 구조에서 첫 번째 이벤트 가져오기
+    // 모든 이벤트 가져오기
     console.log("AI 응답 전체:", aiResponse);
     const eventKeys = Object.keys(aiResponse);
     console.log("이벤트 키들:", eventKeys);
-    const firstEventKey = eventKeys[0];
-    const eventData = aiResponse[firstEventKey];
-    console.log("첫 번째 이벤트 데이터:", eventData);
 
-    if (!eventData) {
+    if (eventKeys.length === 0) {
       return (
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 8 }}>
           <ErrorOutlineIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
@@ -534,17 +537,22 @@ const IntegratedEventPage: React.FC = () => {
             이벤트 데이터를 불러올 수 없습니다
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            디버그: 키={eventKeys.join(', ')}, 데이터={JSON.stringify(eventData)}
+            디버그: 키={eventKeys.join(', ')}
           </Typography>
         </Box>
       );
     }
 
+    // 현재 선택된 이벤트 데이터
+    const selectedEventKey = eventKeys[eventTabValue] || eventKeys[0];
+    const eventData = aiResponse[selectedEventKey];
+    console.log("선택된 이벤트 데이터:", eventData);
+
     return (
       <Box ref={resultRef} sx={{ mb: 4 }}>
         {/* 제목 및 기본 정보 */}
         <Box sx={{ 
-          mb: 4, 
+          mb: 3, 
           p: 3, 
           borderRadius: 2, 
           background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)}, ${alpha(theme.palette.secondary.main, 0.1)})`
@@ -552,12 +560,71 @@ const IntegratedEventPage: React.FC = () => {
           <Typography variant="h4" gutterBottom fontWeight={700} color="primary">
             {formData.productName} 이벤트 기획안
           </Typography>
-          <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>
+          <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
+            📊 총 {eventKeys.length}개의 이벤트 기획안
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            아래 탭에서 각 이벤트를 선택하여 상세 내용을 확인하세요
+          </Typography>
+        </Box>
+
+        {/* 이벤트 탭 네비게이션 */}
+        {eventKeys.length > 1 && (
+          <Box sx={{ mb: 3 }}>
+            <Tabs 
+              value={eventTabValue} 
+              onChange={handleEventTabChange} 
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={{
+                '& .MuiTab-root': { 
+                  fontWeight: 600,
+                  fontSize: '0.9rem',
+                  minHeight: 48,
+                  backgroundColor: alpha(theme.palette.primary.main, 0.05),
+                  margin: 0.5,
+                  borderRadius: 1,
+                }
+              }}
+            >
+              {eventKeys.map((eventKey, index) => {
+                const event = aiResponse[eventKey];
+                return (
+                  <Tab 
+                    key={eventKey}
+                    label={`이벤트 ${index + 1}`}
+                    icon={<EmojiEventsIcon />}
+                    iconPosition="start"
+                  />
+                );
+              })}
+            </Tabs>
+          </Box>
+        )}
+
+        {/* 현재 선택된 이벤트 정보 */}
+        <Box sx={{ 
+          mb: 3, 
+          p: 2, 
+          borderRadius: 2, 
+          border: `2px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+          backgroundColor: alpha(theme.palette.primary.main, 0.02)
+        }}>
+          <Typography variant="h5" gutterBottom fontWeight={600} color="primary">
+            이벤트 {eventTabValue + 1}: {eventData.eventConcept.split('.')[0]}
+          </Typography>
+          <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 1 }}>
             📅 {eventData.startDate} ~ {eventData.endDate}
           </Typography>
-          <Typography variant="body1" sx={{ lineHeight: 1.7 }}>
+          <Typography variant="body1" sx={{ lineHeight: 1.7, mb: 1 }}>
             {eventData.eventConcept}
           </Typography>
+          <Chip 
+            label={`예산: ${parseInt(eventData.budget).toLocaleString()}원`} 
+            color="secondary" 
+            variant="outlined" 
+            size="small"
+          />
         </Box>
 
         {/* 탭 네비게이션 */}
@@ -768,7 +835,7 @@ const IntegratedEventPage: React.FC = () => {
               <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600, color: 'success.main' }}>💰 예산</Typography>
               <Paper sx={{ p: 2, bgcolor: alpha(theme.palette.success.main, 0.03) }}>
                 <Typography variant="h5" fontWeight="bold" color="success.main">
-                  {parseInt(eventData.budget).toLocaleString()}만원
+                  {parseInt(eventData.budget).toLocaleString()}원
                 </Typography>
               </Paper>
             </Box>
