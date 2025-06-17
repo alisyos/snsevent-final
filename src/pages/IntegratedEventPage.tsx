@@ -32,18 +32,7 @@ import AutoGraphIcon from '@mui/icons-material/AutoGraph';
 import DescriptionIcon from '@mui/icons-material/Description';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import BusinessIcon from '@mui/icons-material/Business';
-// PDF 생성 라이브러리 import
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import html2canvas from 'html2canvas';
 import { EventFormData, EventData } from '../types/event';
-
-// jsPDF 타입 확장
-interface ExtendedJsPDF extends jsPDF {
-  lastAutoTable?: {
-    finalY?: number;
-  };
-}
 
 // 목표 KPI 옵션들
 const kpiOptions = [
@@ -304,55 +293,345 @@ const IntegratedEventPage: React.FC = () => {
     }
   };
   
-  const handleSaveAsPdf = async () => {
-    if (!aiResponse || !resultRef.current) return;
+  const handleSaveAsHtml = async () => {
+    if (!aiResponse) return;
     
     try {
       setLoading(true);
       
-      // 화면에 표시되는 결과 컴포넌트를 캡처
-      const canvas = await html2canvas(resultRef.current, {
-        scale: 2, // 고해상도로 렌더링
-        useCORS: true,
-        logging: false,
-        allowTaint: true,
-        backgroundColor: '#ffffff'
+      // 모든 이벤트 가져오기
+      const eventKeys = Object.keys(aiResponse);
+      
+      // HTML 문서 생성
+      let htmlContent = `
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${formData.productName} 이벤트 기획안</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #1976d2;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #1976d2;
+            margin: 0;
+            font-size: 2.5em;
+        }
+        .header .subtitle {
+            color: #666;
+            margin-top: 10px;
+            font-size: 1.2em;
+        }
+        .event-section {
+            margin-bottom: 40px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .event-header {
+            background: linear-gradient(135deg, #1976d2, #42a5f5);
+            color: white;
+            padding: 20px;
+            margin: 0;
+        }
+        .event-header h2 {
+            margin: 0;
+            font-size: 1.8em;
+        }
+        .event-header .dates {
+            margin-top: 10px;
+            opacity: 0.9;
+        }
+        .event-content {
+            padding: 25px;
+        }
+        .concept-box {
+            background: #f8f9fa;
+            border-left: 4px solid #1976d2;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+        .concept-box h3 {
+            color: #1976d2;
+            margin-top: 0;
+        }
+        .budget-chip {
+            display: inline-block;
+            background: #4caf50;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .tab-section {
+            margin-bottom: 30px;
+        }
+        .tab-title {
+            background: #1976d2;
+            color: white;
+            padding: 15px 20px;
+            margin: 0;
+            font-size: 1.3em;
+            border-radius: 6px 6px 0 0;
+        }
+        .tab-content {
+            background: #fafafa;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 0 0 6px 6px;
+        }
+        .process-step {
+            background: white;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-left: 4px solid #ff9800;
+        }
+        .process-step::before {
+            content: "✓ ";
+            color: #ff9800;
+            font-weight: bold;
+        }
+        .content-format {
+            margin-bottom: 25px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .content-format h4 {
+            color: #1976d2;
+            margin-top: 0;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 10px;
+        }
+        .slide-item, .frame-item {
+            background: #f8f9fa;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 4px;
+            border-left: 3px solid #2196f3;
+        }
+        .hashtags {
+            margin-top: 15px;
+        }
+        .hashtag {
+            display: inline-block;
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 8px;
+            margin: 2px;
+            border-radius: 12px;
+            font-size: 0.9em;
+        }
+        .goal-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .goal-box {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .quantitative {
+            border-left: 4px solid #4caf50;
+        }
+        .qualitative {
+            border-left: 4px solid #ff9800;
+        }
+        .metric-box, .reward-box {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .metric-box {
+            border-left: 4px solid #9c27b0;
+        }
+        .reward-box {
+            border-left: 4px solid #f44336;
+        }
+        @media (max-width: 768px) {
+            .goal-section {
+                grid-template-columns: 1fr;
+            }
+            .container {
+                padding: 15px;
+            }
+            body {
+                padding: 10px;
+            }
+        }
+        .print-date {
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>${formData.productName} 이벤트 기획안</h1>
+            <div class="subtitle">총 ${eventKeys.length}개의 이벤트 기획안</div>
+        </div>
+`;
+
+      // 각 이벤트에 대한 HTML 생성
+      eventKeys.forEach((eventKey, index) => {
+        const eventData = aiResponse[eventKey];
+        
+        htmlContent += `
+        <div class="event-section">
+            <div class="event-header">
+                <h2>이벤트 ${index + 1}: ${eventData.eventConcept.split('.')[0]}</h2>
+                <div class="dates">📅 ${eventData.startDate} ~ ${eventData.endDate}</div>
+            </div>
+            <div class="event-content">
+                <div class="concept-box">
+                    <h3>🎯 이벤트 컨셉</h3>
+                    <p>${eventData.eventConcept}</p>
+                    <span class="budget-chip">예산: ${parseInt(eventData.budget).toLocaleString()}원</span>
+                </div>
+                
+                <div class="tab-section">
+                    <h3 class="tab-title">📋 실행 계획</h3>
+                    <div class="tab-content">
+                        ${eventData.contentMechanics.process.map(step => `<div class="process-step">${step}</div>`).join('')}
+                    </div>
+                </div>
+                
+                <div class="tab-section">
+                    <h3 class="tab-title">📱 콘텐츠 전략</h3>
+                    <div class="tab-content">
+                        <div class="content-format">
+                            <h4>📸 피드 포스트</h4>
+                            ${eventData.contentMechanics.postFormats.feed.carouselSlides ? 
+                                eventData.contentMechanics.postFormats.feed.carouselSlides.map(slide => 
+                                    `<div class="slide-item"><strong>슬라이드 ${slide.slide}:</strong> ${slide.concept}</div>`
+                                ).join('') : ''}
+                            ${eventData.contentMechanics.postFormats.feed.caption ? 
+                                `<div style="margin-top: 15px;"><strong>캡션:</strong><br>${eventData.contentMechanics.postFormats.feed.caption.replace(/\n/g, '<br>')}</div>` : ''}
+                            <div class="hashtags">
+                                ${eventData.contentMechanics.postFormats.feed.hashtags.map(tag => `<span class="hashtag">${tag}</span>`).join('')}
+                            </div>
+                        </div>
+                        
+                        <div class="content-format">
+                            <h4>🎬 릴스</h4>
+                            ${eventData.contentMechanics.postFormats.reels.duration ? `<p><strong>길이:</strong> ${eventData.contentMechanics.postFormats.reels.duration}</p>` : ''}
+                            ${eventData.contentMechanics.postFormats.reels.hookFirst3s ? `<p><strong>첫 3초 훅:</strong> ${eventData.contentMechanics.postFormats.reels.hookFirst3s}</p>` : ''}
+                            ${eventData.contentMechanics.postFormats.reels.mainScenes ? `<p><strong>메인 씬:</strong> ${eventData.contentMechanics.postFormats.reels.mainScenes}</p>` : ''}
+                            ${eventData.contentMechanics.postFormats.reels.audio ? `<p><strong>음악:</strong> ${eventData.contentMechanics.postFormats.reels.audio}</p>` : ''}
+                            ${eventData.contentMechanics.postFormats.reels.caption ? `<p><strong>캡션:</strong> ${eventData.contentMechanics.postFormats.reels.caption}</p>` : ''}
+                            <div class="hashtags">
+                                ${eventData.contentMechanics.postFormats.reels.hashtags.map(tag => `<span class="hashtag">${tag}</span>`).join('')}
+                            </div>
+                        </div>
+                        
+                        <div class="content-format">
+                            <h4>📖 스토리</h4>
+                            ${eventData.contentMechanics.postFormats.stories.frame1 ? 
+                                `<div class="frame-item"><strong>프레임 1 (${eventData.contentMechanics.postFormats.stories.frame1.type}):</strong> ${eventData.contentMechanics.postFormats.stories.frame1.text}</div>` : ''}
+                            ${eventData.contentMechanics.postFormats.stories.frame2 ? 
+                                `<div class="frame-item"><strong>프레임 2 (${eventData.contentMechanics.postFormats.stories.frame2.type}):</strong> ${eventData.contentMechanics.postFormats.stories.frame2.text}</div>` : ''}
+                            ${eventData.contentMechanics.postFormats.stories.frame3 ? 
+                                `<div class="frame-item"><strong>프레임 3 (${eventData.contentMechanics.postFormats.stories.frame3.type}):</strong> ${eventData.contentMechanics.postFormats.stories.frame3.text}</div>` : ''}
+                            <div class="hashtags">
+                                ${eventData.contentMechanics.postFormats.stories.hashtags.map(tag => `<span class="hashtag">${tag}</span>`).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="tab-section">
+                    <h3 class="tab-title">🎯 목표 & 성과</h3>
+                    <div class="tab-content">
+                        <div class="goal-section">
+                            <div class="goal-box quantitative">
+                                <h4>📊 정량적 목표</h4>
+                                <p>${eventData.goal.quantitative.replace(/\n/g, '<br>')}</p>
+                            </div>
+                            <div class="goal-box qualitative">
+                                <h4>🎨 정성적 목표</h4>
+                                <p>${eventData.goal.qualitative.replace(/\n/g, '<br>')}</p>
+                            </div>
+                        </div>
+                        <div class="metric-box">
+                            <h4>📈 성과 측정 방식</h4>
+                            <p>${eventData.performanceMetric.replace(/\n/g, '<br>')}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="tab-section">
+                    <h3 class="tab-title">🏆 경품 & 예산</h3>
+                    <div class="tab-content">
+                        <div class="reward-box">
+                            <h4>🎁 경품 구성</h4>
+                            <p>${eventData.rewards.replace(/\n/g, '<br>')}</p>
+                        </div>
+                        <div style="text-align: center; margin-top: 20px;">
+                            <span class="budget-chip">총 예산: ${parseInt(eventData.budget).toLocaleString()}원</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+`;
       });
-      
-      const imgData = canvas.toDataURL('image/jpeg', 1.0);
-      
-      // PDF 생성
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-      
-      // 이미지 크기 계산
-      const imgWidth = 210; // A4 width in mm
-      const pageHeight = 295; // A4 height in mm
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
-      
-      // 첫 페이지 추가
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-      
-      // 필요한 경우 여러 페이지로 분할
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-      
-      // PDF 다운로드
-      pdf.save(`SNS_이벤트_기획안_${new Date().toISOString().split('T')[0]}.pdf`);
+
+      htmlContent += `
+        <div class="print-date">
+            생성일: ${new Date().toLocaleDateString('ko-KR')} ${new Date().toLocaleTimeString('ko-KR')}
+        </div>
+    </div>
+</body>
+</html>`;
+
+      // HTML 파일 다운로드
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `SNS_이벤트_기획안_${formData.productName}_${new Date().toISOString().split('T')[0]}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
       
     } catch (error) {
-      console.error('PDF 생성 중 오류 발생:', error);
-      setError('PDF 생성 중 오류가 발생했습니다.');
+      console.error('HTML 생성 중 오류 발생:', error);
+      setError('HTML 파일 생성 중 오류가 발생했습니다.');
       setOpenSnackbar(true);
     } finally {
       setLoading(false);
@@ -875,11 +1154,11 @@ const IntegratedEventPage: React.FC = () => {
             <Button 
               variant="outlined" 
               size="medium"
-              onClick={handleSaveAsPdf}
+              onClick={handleSaveAsHtml}
               startIcon={<DownloadIcon />}
               sx={{ borderRadius: 20, px: 3 }}
             >
-              PDF 다운로드
+              HTML 다운로드
             </Button>
           </Box>
         </Box>
