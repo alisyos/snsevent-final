@@ -861,16 +861,27 @@ const IntegratedEventPage: React.FC = () => {
             onChange={handleFeedbackChange}
             sx={{ mb: 2 }}
           />
-          <Button 
-            variant="contained" 
-            size="medium"
-            onClick={handleFeedbackSubmit}
-            disabled={!feedback.trim()}
-            endIcon={<SendIcon />}
-            sx={{ borderRadius: 20, px: 3 }}
-          >
-            피드백 제출
-          </Button>
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            <Button 
+              variant="contained" 
+              size="medium"
+              onClick={handleFeedbackSubmit}
+              disabled={!feedback.trim()}
+              endIcon={<SendIcon />}
+              sx={{ borderRadius: 20, px: 3 }}
+            >
+              피드백 제출
+            </Button>
+            <Button 
+              variant="outlined" 
+              size="medium"
+              onClick={handleSaveAsPdf}
+              startIcon={<DownloadIcon />}
+              sx={{ borderRadius: 20, px: 3 }}
+            >
+              PDF 다운로드
+            </Button>
+          </Box>
         </Box>
       </Box>
     );
